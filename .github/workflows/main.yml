@@ -42,16 +42,37 @@ jobs:
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      # INI STEP BARU UNTUK FULLSCREEN & LANDSCAPE
-      - name: Force Landscape & Fullscreen
+      # STEP BARU: TULIS TERUS KE MAINACTIVITY.JAVA
+      - name: Force Landscape & Fullscreen (Immersive Mode)
         run: |
           cd android
           
-          # 1. Paksa Landscape (Guna sensorLandscape supaya boleh pusing kiri/kanan)
+          # 1. Paksa Landscape dalam AndroidManifest
           sed -i 's/android:name="MainActivity"/android:name="MainActivity" android:screenOrientation="sensorLandscape"/g' app/src/main/AndroidManifest.xml
           
-          # 2. Paksa Fullscreen (Hilangkan Status Bar atas dengan ubah fail tema Android)
-          sed -i 's/<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">/<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar"><item name="android:windowFullscreen">true<\/item>/g' app/src/main/res/values/styles.xml
+          # 2. Paksa Fullscreen & Notch guna Java (Tulis semula fail MainActivity.java)
+          cat << 'EOF' > app/src/main/java/com/visualengine/app/MainActivity.java
+          package com.visualengine.app;
+
+          import android.os.Bundle;
+          import android.view.WindowManager;
+          import com.getcapacitor.BridgeActivity;
+
+          public class MainActivity extends BridgeActivity {
+              @Override
+              public void onCreate(Bundle savedInstanceState) {
+                  super.onCreate(savedInstanceState);
+                  
+                  // Tembak mati Status Bar (Fullscreen)
+                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                  
+                  // Paksa app langgar masuk kawasan Notch/Lubang Kamera (API 28+)
+                  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                      getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                  }
+              }
+          }
+          EOF
 
       - name: Fix Kotlin Conflict & Build APK
         run: |
