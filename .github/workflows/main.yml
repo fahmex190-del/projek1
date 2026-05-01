@@ -36,7 +36,7 @@ jobs:
           npm install -D @capacitor/cli
           npx cap init VisualEngine com.visualengine.app --web-dir out
           
-          # Ini untuk pastikan ia tak error kalau folder android dah wujud
+          # Pastikan ia tak error kalau folder android dah wujud
           npx cap add android || true
           npx cap sync android
           
@@ -44,9 +44,22 @@ jobs:
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      - name: Build APK with Gradle
+      - name: Fix Kotlin Conflict & Build APK
         run: |
           cd android
+          
+          # Ini 'ubat' tambahan untuk paksa Gradle guna Kotlin 1.8.22 sahaja
+          echo "
+          configurations.all {
+              resolutionStrategy.eachDependency { DependencyResolveDetails details ->
+                  def requested = details.requested
+                  if (requested.group == 'org.jetbrains.kotlin') {
+                      details.useVersion '1.8.22'
+                  }
+              }
+          }
+          " >> app/build.gradle
+          
           chmod +x gradlew
           ./gradlew clean
           ./gradlew assembleDebug --stacktrace
