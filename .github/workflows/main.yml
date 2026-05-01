@@ -24,15 +24,13 @@ jobs:
       - name: Build Next.js (Static Export)
         run: npm run build
 
-      # Tukar kepada Java 21 kat sini
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      # Perhatikan aku dah buang 'Setup Android SDK' kat sini supaya tak conflict
 
       - name: Install & Configure Capacitor
         run: |
@@ -46,7 +44,9 @@ jobs:
         run: |
           cd android
           chmod +x gradlew
-          ./gradlew assembleDebug
+          # Kita tambah arahan 'clean' dan '--stacktrace'
+          ./gradlew clean
+          ./gradlew assembleDebug --stacktrace
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
