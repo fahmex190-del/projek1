@@ -18,16 +18,18 @@ jobs:
         with:
           node-version: '20'
 
-      # PERUBAHAN DI SINI: Kita install Capacitor awal-awal sebelum Next.js build
-      - name: Install NPM Dependencies & Capacitor
+      - name: Install NPM Dependencies & Capacitor Plugins
         run: |
           npm install
-          npm install @capacitor/core @capacitor/android
+          # KITA INSTALL PLUGIN STATUS BAR UNTUK MATIKANNYA DARI DALAM
+          npm install @capacitor/core @capacitor/android @capacitor/status-bar
           npm install -D @capacitor/cli
 
-      # Sekarang baru Next.js build (dia takkan error sebab capacitor dah install)
-      - name: Build Next.js (Static Export)
-        run: npm run build
+      - name: Build Next.js & Paksa Viewport HTML
+        run: |
+          npm run build
+          # BOT AKAN CARI SEMUA HTML DAN PAKSA MASUKKAN KOD LANGGAR NOTCH
+          find out -type f -name "*.html" -exec sed -i 's/<head>/<head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" \/>/g' {} +
 
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
@@ -35,55 +37,93 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
+      - name: Cipta Capacitor Config Khas
+        run: |
+          # BINA FAIL CONFIG BARU YANG HARAMKAN STATUS BAR
+          cat << 'EOF' > capacitor.config.json
+          {
+            "appId": "com.visualengine.app",
+            "appName": "VisualEngine",
+            "webDir": "out",
+            "plugins": {
+              "StatusBar": {
+                "hidden": true
+              }
+            }
+          }
+          EOF
+
       - name: Configure Capacitor
         run: |
           npx cap add android || true
           npx cap sync android
-          
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      - name: Force Fullscreen & Hardware Accelerated
+      - name: Tulis Semula Tema Android & MainActivity
         run: |
           cd android
           # Paksa Landscape
           sed -i 's/android:name="MainActivity"/android:name="MainActivity" android:screenOrientation="sensorLandscape"/g' app/src/main/AndroidManifest.xml
           
-          # Tambah Hardware Accelerated & WindowSoftInputMode
-          sed -i 's/<application/<application android:hardwareAccelerated="true"/g' app/src/main/AndroidManifest.xml
-          sed -i 's/android:configChanges="/android:windowSoftInputMode="adjustResize" android:configChanges="/g' app/src/main/AndroidManifest.xml
+          # Tulis Semula styles.xml secara paksa (Hilangkan ActionBar sepenuhnya)
+          cat << 'EOF' > app/src/main/res/values/styles.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+                  <item name="android:windowFullscreen">true</item>
+                  <item name="android:windowContentOverlay">@null</item>
+              </style>
+              <style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">
+                  <item name="windowActionBar">false</item>
+                  <item name="windowNoTitle">true</item>
+                  <item name="android:windowFullscreen">true</item>
+              </style>
+              <style name="AppTheme.NoActionBarLaunch" parent="AppTheme.NoActionBar">
+                  <item name="android:background">@drawable/splash</item>
+              </style>
+          </resources>
+          EOF
 
-          # Tulis Java Modern Immersive Mode
+          # Tulis Java Immersive Sticky (Telan palang secara total)
           cat << 'EOF' > app/src/main/java/com/visualengine/app/MainActivity.java
           package com.visualengine.app;
 
           import android.os.Bundle;
-          import android.view.Window;
+          import android.view.View;
           import android.view.WindowManager;
-          import androidx.core.view.WindowCompat;
-          import androidx.core.view.WindowInsetsCompat;
-          import androidx.core.view.WindowInsetsControllerCompat;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  Window window = getWindow();
                   if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                      window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                      getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                   }
-                  WindowCompat.setDecorFitsSystemWindows(window, false);
-                  WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
-                  if (insetsController != null) {
-                      insetsController.hide(WindowInsetsCompat.Type.systemBars());
-                      insetsController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
-                  }
+                  hideSystemUI();
+              }
+
+              @Override
+              public void onWindowFocusChanged(boolean hasFocus) {
+                  super.onWindowFocusChanged(hasFocus);
+                  if (hasFocus) { hideSystemUI(); }
+              }
+
+              private void hideSystemUI() {
+                  getWindow().getDecorView().setSystemUiVisibility(
+                      View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                      | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                      | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                      | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                      | View.SYSTEM_UI_FLAG_FULLSCREEN
+                  );
               }
           }
           EOF
 
-      - name: Fix Kotlin Conflict & Build APK
+      - name: Fix Kotlin & Build APK
         run: |
           cd android
           echo "configurations.all { resolutionStrategy.eachDependency { details -> if (details.requested.group == 'org.jetbrains.kotlin') { details.useVersion '1.8.22' } } }" >> app/build.gradle
@@ -91,7 +131,7 @@ jobs:
           ./gradlew clean
           ./gradlew assembleDebug
 
-      - name: Upload APK Artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: VisualEngine-APK
