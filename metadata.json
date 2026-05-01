@@ -1,0 +1,5 @@
+{
+  "name": "game engine 2d Op",
+  "description": "Responsif mobile 2D game engine dengan UI menyerupai Unity, text drag-to-adjust, dan floating transform tools.",
+  "requestFramePermissions": []
+}

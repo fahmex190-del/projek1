@@ -1,0 +1,38 @@
+import type {NextConfig} from 'next';
+
+const nextConfig: NextConfig = {
+  reactStrictMode: true,
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: false,
+  },
+  images: {
+    // PENTING: Untuk bina APK / Static HTML fail, Next.js 'image optimization' mesti ditutup (unoptimized: true)
+    // kerana fungsi ini memerlukan node.js server (yang tidak wujud dalam fail APK static).
+    unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'picsum.photos',
+        port: '',
+        pathname: '/**', 
+      },
+    ],
+  },
+  // PENTING: output 'export' akan bina fail "out/" iaitu 100% fail statik HTML, CSS & JS.
+  // Fail-fail statik ini yang anda perlu masukkan ke dalam Capacitor / Cordova untuk jadikan APK!
+  output: 'export',
+  transpilePackages: ['motion'],
+  webpack: (config, {dev}) => {
+    if (dev && process.env.DISABLE_HMR === 'true') {
+      config.watchOptions = {
+        ignored: /.*/,
+      };
+    }
+    return config;
+  },
+};
+
+export default nextConfig;
