@@ -21,8 +21,12 @@ jobs:
       - name: Install NPM Dependencies
         run: npm install
 
-      - name: Build Next.js (Static Export)
-        run: npm run build
+      # STEP BARU: Bina web & paksa masukkan kod langgar kamera (viewport-fit=cover)
+      - name: Build Next.js & Force Viewport
+        run: |
+          npm run build
+          # Bot akan cari semua fail HTML dan paksa letak kod ni supaya webview tak segan-segan langgar notch
+          find out -type f -name "*.html" -exec sed -i 's/<\/head>/<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" \/><\/head>/g' {} +
 
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
@@ -42,20 +46,22 @@ jobs:
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      # STEP BARU: TULIS TERUS KE MAINACTIVITY.JAVA
-      - name: Force Landscape & Fullscreen (Immersive Mode)
+      # STEP BARU: JAVA MODEN (API 30+) UNTUK ANDROID TERKINI
+      - name: Force Landscape & Modern Immersive Mode
         run: |
           cd android
           
-          # 1. Paksa Landscape dalam AndroidManifest
           sed -i 's/android:name="MainActivity"/android:name="MainActivity" android:screenOrientation="sensorLandscape"/g' app/src/main/AndroidManifest.xml
           
-          # 2. Paksa Fullscreen & Notch guna Java (Tulis semula fail MainActivity.java)
           cat << 'EOF' > app/src/main/java/com/visualengine/app/MainActivity.java
           package com.visualengine.app;
 
           import android.os.Bundle;
+          import android.view.Window;
           import android.view.WindowManager;
+          import androidx.core.view.WindowCompat;
+          import androidx.core.view.WindowInsetsCompat;
+          import androidx.core.view.WindowInsetsControllerCompat;
           import com.getcapacitor.BridgeActivity;
 
           public class MainActivity extends BridgeActivity {
@@ -63,12 +69,19 @@ jobs:
               public void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
                   
-                  // Tembak mati Status Bar (Fullscreen)
-                  getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+                  Window window = getWindow();
                   
-                  // Paksa app langgar masuk kawasan Notch/Lubang Kamera (API 28+)
+                  // 1. Paksa masuk kawasan Notch/Lubang Kamera
                   if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                      getWindow().getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                      window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
+                  }
+                  
+                  // 2. Kod Android Moden untuk sapu bersih Status Bar & Navigation Bar
+                  WindowCompat.setDecorFitsSystemWindows(window, false);
+                  WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
+                  if (insetsController != null) {
+                      insetsController.hide(WindowInsetsCompat.Type.systemBars());
+                      insetsController.setSystemBarsBehavior(WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
                   }
               }
           }
