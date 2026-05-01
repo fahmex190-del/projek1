@@ -1,6 +1,5 @@
 name: Build Next.js to APK
 
-# Proses ini akan berjalan setiap kali ada perubahan baru atau kau tekan manual
 on:
   push:
     branches: [ main ]
@@ -12,49 +11,44 @@ jobs:
 
     steps:
       - name: Checkout Source Code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
       - name: Install NPM Dependencies
         run: npm install
 
-      # Ia akan compile Next.js kau jadi fail static di dalam folder 'out'
       - name: Build Next.js (Static Export)
         run: npm run build
 
       - name: Setup Java JDK 17
-        uses: actions/setup-java@v3
+        uses: actions/setup-java@v4
         with:
           java-version: '17'
           distribution: 'temurin'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v2
+        uses: android-actions/setup-android@v3
 
-      # Pasang Capacitor untuk tukar web Next.js kepada Apps Android
       - name: Install & Configure Capacitor
         run: |
           npm install @capacitor/core @capacitor/android
           npm install -D @capacitor/cli
-          # Initialize capacitor dan halakan ia ke folder 'out' dari Next.js
           npx cap init VisualEngine com.visualengine.app --web-dir out
           npx cap add android
           npx cap sync android
 
-      # Bina file APK
       - name: Build APK with Gradle
         run: |
           cd android
           chmod +x gradlew
           ./gradlew assembleDebug
 
-      # Muat naik APK supaya kau boleh download
       - name: Upload APK Artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: VisualEngine-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
