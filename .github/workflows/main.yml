@@ -21,12 +21,8 @@ jobs:
       - name: Install NPM Dependencies
         run: npm install
 
-      # STEP BARU: Bina web & paksa masukkan kod langgar kamera (viewport-fit=cover)
-      - name: Build Next.js & Force Viewport
-        run: |
-          npm run build
-          # Bot akan cari semua fail HTML dan paksa letak kod ni supaya webview tak segan-segan langgar notch
-          find out -type f -name "*.html" -exec sed -i 's/<\/head>/<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" \/><\/head>/g' {} +
+      - name: Build Next.js (Static Export)
+        run: npm run build
 
       - name: Setup Java JDK 21
         uses: actions/setup-java@v4
@@ -38,21 +34,24 @@ jobs:
         run: |
           npm install @capacitor/core @capacitor/android
           npm install -D @capacitor/cli
-          npx cap init VisualEngine com.visualengine.app --web-dir out
-          
+          # Kita tak guna 'npx cap init' sebab dah ada fail config manual
           npx cap add android || true
           npx cap sync android
           
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
 
-      # STEP BARU: JAVA MODEN (API 30+) UNTUK ANDROID TERKINI
-      - name: Force Landscape & Modern Immersive Mode
+      - name: Force Fullscreen & Hardware Accelerated
         run: |
           cd android
-          
+          # Paksa Landscape
           sed -i 's/android:name="MainActivity"/android:name="MainActivity" android:screenOrientation="sensorLandscape"/g' app/src/main/AndroidManifest.xml
           
+          # Tambah Hardware Accelerated & WindowSoftInputMode
+          sed -i 's/<application/<application android:hardwareAccelerated="true"/g' app/src/main/AndroidManifest.xml
+          sed -i 's/android:configChanges="/android:windowSoftInputMode="adjustResize" android:configChanges="/g' app/src/main/AndroidManifest.xml
+
+          # Tulis Java Modern Immersive Mode
           cat << 'EOF' > app/src/main/java/com/visualengine/app/MainActivity.java
           package com.visualengine.app;
 
@@ -68,15 +67,10 @@ jobs:
               @Override
               public void onCreate(Bundle savedInstanceState) {
                   super.onCreate(savedInstanceState);
-                  
                   Window window = getWindow();
-                  
-                  // 1. Paksa masuk kawasan Notch/Lubang Kamera
                   if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                       window.getAttributes().layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES;
                   }
-                  
-                  // 2. Kod Android Moden untuk sapu bersih Status Bar & Navigation Bar
                   WindowCompat.setDecorFitsSystemWindows(window, false);
                   WindowInsetsControllerCompat insetsController = WindowCompat.getInsetsController(window, window.getDecorView());
                   if (insetsController != null) {
@@ -90,21 +84,10 @@ jobs:
       - name: Fix Kotlin Conflict & Build APK
         run: |
           cd android
-          
-          echo "
-          configurations.all {
-              resolutionStrategy.eachDependency { DependencyResolveDetails details ->
-                  def requested = details.requested
-                  if (requested.group == 'org.jetbrains.kotlin') {
-                      details.useVersion '1.8.22'
-                  }
-              }
-          }
-          " >> app/build.gradle
-          
+          echo "configurations.all { resolutionStrategy.eachDependency { details -> if (details.requested.group == 'org.jetbrains.kotlin') { details.useVersion '1.8.22' } } }" >> app/build.gradle
           chmod +x gradlew
           ./gradlew clean
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleDebug
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
