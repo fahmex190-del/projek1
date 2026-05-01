@@ -30,21 +30,24 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      # Perhatikan aku dah buang 'Setup Android SDK' kat sini supaya tak conflict
-
       - name: Install & Configure Capacitor
         run: |
           npm install @capacitor/core @capacitor/android
           npm install -D @capacitor/cli
           npx cap init VisualEngine com.visualengine.app --web-dir out
-          npx cap add android
+          
+          # Ini untuk pastikan ia tak error kalau folder android dah wujud
+          npx cap add android || true
           npx cap sync android
+          
+          # Ini 'ubat' untuk fix error Duplicate Classes (Jetifier)
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
 
       - name: Build APK with Gradle
         run: |
           cd android
           chmod +x gradlew
-          # Kita tambah arahan 'clean' dan '--stacktrace'
           ./gradlew clean
           ./gradlew assembleDebug --stacktrace
 
