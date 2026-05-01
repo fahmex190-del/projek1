@@ -18,9 +18,14 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install NPM Dependencies
-        run: npm install
+      # PERUBAHAN DI SINI: Kita install Capacitor awal-awal sebelum Next.js build
+      - name: Install NPM Dependencies & Capacitor
+        run: |
+          npm install
+          npm install @capacitor/core @capacitor/android
+          npm install -D @capacitor/cli
 
+      # Sekarang baru Next.js build (dia takkan error sebab capacitor dah install)
       - name: Build Next.js (Static Export)
         run: npm run build
 
@@ -30,11 +35,8 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
 
-      - name: Install & Configure Capacitor
+      - name: Configure Capacitor
         run: |
-          npm install @capacitor/core @capacitor/android
-          npm install -D @capacitor/cli
-          # Kita tak guna 'npx cap init' sebab dah ada fail config manual
           npx cap add android || true
           npx cap sync android
           
