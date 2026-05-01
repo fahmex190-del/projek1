@@ -36,19 +36,27 @@ jobs:
           npm install -D @capacitor/cli
           npx cap init VisualEngine com.visualengine.app --web-dir out
           
-          # Pastikan ia tak error kalau folder android dah wujud
           npx cap add android || true
           npx cap sync android
           
-          # Ini 'ubat' untuk fix error Duplicate Classes (Jetifier)
           echo "android.useAndroidX=true" >> android/gradle.properties
           echo "android.enableJetifier=true" >> android/gradle.properties
+
+      # INI STEP BARU UNTUK FULLSCREEN & LANDSCAPE
+      - name: Force Landscape & Fullscreen
+        run: |
+          cd android
+          
+          # 1. Paksa Landscape (Guna sensorLandscape supaya boleh pusing kiri/kanan)
+          sed -i 's/android:name="MainActivity"/android:name="MainActivity" android:screenOrientation="sensorLandscape"/g' app/src/main/AndroidManifest.xml
+          
+          # 2. Paksa Fullscreen (Hilangkan Status Bar atas dengan ubah fail tema Android)
+          sed -i 's/<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">/<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar"><item name="android:windowFullscreen">true<\/item>/g' app/src/main/res/values/styles.xml
 
       - name: Fix Kotlin Conflict & Build APK
         run: |
           cd android
           
-          # Ini 'ubat' tambahan untuk paksa Gradle guna Kotlin 1.8.22 sahaja
           echo "
           configurations.all {
               resolutionStrategy.eachDependency { DependencyResolveDetails details ->
